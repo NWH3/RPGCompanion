@@ -3,7 +3,7 @@ RPGCompanion is a Discord Bot designed to help players by simplifying some of th
 
 Overview of commands:
 
-- Roll Dice: !r YdX where Y and X are some real number
+- Roll Dice: !r YdX where Y and X are some real number, Example: !r 1d6 or !r d6
 
 - Create Character Sheet: !c fieldOne="some value here" fieldTwo={name:"name here",type:"with type"} fieldThree=[{name:"name",type"type"}]
 
