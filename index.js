@@ -3,7 +3,7 @@ fs = require('fs');
 const Discord = require('discord.js');
 const client = new Discord.Client();
 
-let DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-]?[\s]*[0-9]*[\s]*$/;
+let DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
 let CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
 
 client.on('ready', () => {
@@ -24,15 +24,40 @@ client.on('message', msg => {
 				if (msgAry[2].toUpperCase() === 'D') {
 					// Has single dice roll
 					let numberOfEdges = msgAry[3];
+					let extraValue = 0;
+					let operation = null;
+					if (msgAry.length >= 6) {
+						extraValue = parseInt(msgAry[5]);
+						operation = msgAry[4];
+					}
 					let totalTimeInMS = new Date().getTime();
 					let randomNumber = Math.random();
 					let randomNumberTwo = Math.random();
 					let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
-					msg.reply('Result: ' + roll);
+
+					let extraValueStr = '';
+					if (msgAry.length >= 6 && operation) {
+						if (operation === '+') {
+							extraValueStr = ' + ' + extraValue + ' equals: ' + (roll + extraValue);
+						} else if (operation === '-') {
+							extraValueStr = ' - ' + extraValue + ' equals: ' + (roll - extraValue);
+						} else if (operation === '/') {
+							extraValueStr = ' / ' + extraValue + ' equals: ' + (roll / extraValue);
+						} else if (operation === '*') {
+							extraValueStr = ' * ' + extraValue + ' equals: ' + (roll * extraValue);
+						}
+					}
+					msg.reply('Result: ' + roll + extraValueStr);
 				} else if (msgAry.length >= 5 && msgAry[3].toUpperCase() === 'D') {
 					// Has multiple dice rolls
 					let numberOfRolls = msgAry[2];
 					let numberOfEdges = msgAry[4];
+					let extraValue = 0;
+					let operation = null;
+					if (msgAry.length >= 7) {
+						extraValue = parseInt(msgAry[6]);
+						operation = msgAry[5];
+					}
 					let total = 0;
 					let finalMsg = '';
 					for (let index = 0; index < numberOfRolls; index++) {		
@@ -40,8 +65,21 @@ client.on('message', msg => {
 						let randomNumber = Math.random();
 						let randomNumberTwo = Math.random();
 						let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
-						total += roll;
-						finalMsg += '[' + roll + '] ';
+
+						let extraValueStr = '';
+						if (msgAry.length >= 6 && operation) {
+							if (operation === '+') {
+								extraValueStr = ' + ' + extraValue + ',' + (roll + extraValue);
+							} else if (operation === '-') {
+								extraValueStr = ' - ' + extraValue + ',' + (roll - extraValue);
+							} else if (operation === '/') {
+								extraValueStr = ' / ' + extraValue + ',' + (roll / extraValue);
+							} else if (operation === '*') {
+								extraValueStr = ' * ' + extraValue + ',' + (roll * extraValue);
+							}
+						}
+						total = (total + roll + extraValue);
+						finalMsg += '[' + roll + extraValueStr + '] ';
 					}
 					msg.reply('Result(s): ' + finalMsg.trim() + ' with total: ' + total);
 				}
