@@ -1,0 +1,15 @@
+{
+  "name": "rpgcompanion",
+  "version": "1.0.0",
+  "description": "Discord Bot which provides table top RPG functions such as dice rolling, character sheet creation, and item management",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "author": "Nathanial W. Heard",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^12.3.1",
+    "dotenv": "^8.2.0"
+  }
+}
