@@ -7,7 +7,7 @@
     "test": "npm test"
   },
   "author": "Nathanial W. Heard",
-  "license": "ISC",
+  "license": "GPL2",
   "dependencies": {
     "discord.js": "^12.3.1",
     "dotenv": "^8.2.0"
