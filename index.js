@@ -5,6 +5,9 @@ const client = new Discord.Client();
 
 let DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
 let CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
+let DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
+let ATTACK_REGEX = /^!(attack|atk|attk)[\s]*$/i;
+let DEFEND_REGEX = /^!(defend|defense|def)[\s]*$/i;
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -30,22 +33,11 @@ client.on('message', msg => {
 						extraValue = parseInt(msgAry[5]);
 						operation = msgAry[4];
 					}
-					let totalTimeInMS = new Date().getTime();
-					let randomNumber = Math.random();
-					let randomNumberTwo = Math.random();
-					let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
+					let roll = rollDice(numberOfEdges);
 
 					let extraValueStr = '';
 					if (msgAry.length >= 6 && operation) {
-						if (operation === '+') {
-							extraValueStr = ' + ' + extraValue + ' equals: ' + (roll + extraValue);
-						} else if (operation === '-') {
-							extraValueStr = ' - ' + extraValue + ' equals: ' + (roll - extraValue);
-						} else if (operation === '/') {
-							extraValueStr = ' / ' + extraValue + ' equals: ' + (roll / extraValue);
-						} else if (operation === '*') {
-							extraValueStr = ' * ' + extraValue + ' equals: ' + (roll * extraValue);
-						}
+						extraValueStr = getExtraValue(roll, extraValue, operation);
 					}
 					msg.reply('Result: ' + roll + extraValueStr);
 				} else if (msgAry.length >= 5 && msgAry[3].toUpperCase() === 'D') {
@@ -60,23 +52,12 @@ client.on('message', msg => {
 					}
 					let total = 0;
 					let finalMsg = '';
-					for (let index = 0; index < numberOfRolls; index++) {		
-						let totalTimeInMS = new Date().getTime();
-						let randomNumber = Math.random();
-						let randomNumberTwo = Math.random();
-						let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
+					for (let index = 0; index < numberOfRolls; index++) {	
+						let roll = rollDice(numberOfEdges);
 
 						let extraValueStr = '';
 						if (msgAry.length >= 6 && operation) {
-							if (operation === '+') {
-								extraValueStr = ' + ' + extraValue + ',' + (roll + extraValue);
-							} else if (operation === '-') {
-								extraValueStr = ' - ' + extraValue + ',' + (roll - extraValue);
-							} else if (operation === '/') {
-								extraValueStr = ' / ' + extraValue + ',' + (roll / extraValue);
-							} else if (operation === '*') {
-								extraValueStr = ' * ' + extraValue + ',' + (roll * extraValue);
-							}
+							extraValueStr = getExtraValue(roll, extraValue, operation);
 						}
 						total = (total + roll + extraValue);
 						finalMsg += '[' + roll + extraValueStr + '] ';
@@ -112,24 +93,139 @@ client.on('message', msg => {
 					console.log('Wrote contents to ' + msg.author.username + '_character.json...');
 				});
 				msg.reply('Processed create character: ' + characterJson);
-			} else if (msgAry.length >= 2 && msgAry[1].toUpperCase() === 'D') {
+			} else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'D') {
 				character = parseContents(character, originalMsg)
 			
 				let characterJson = JSON.stringify(character);
 				fs.unlinkSync(msg.author.username + '_character.json');
 				msg.reply('Processed delete character: ' + characterJson);
-			} else if (msgAry.length >= 2 && msgAry[1].toUpperCase() === 'S') {
+			} else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'S') {
 				fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
 					character = JSON.parse(data)
-		
 					let characterJson = JSON.stringify(character);
-					fs.writeFile(msg.author.username + '_character.json', characterJson, function (err) {
-						if (err){
-							return console.log(err);
-						}
-						console.log('Reading contents to ' + msg.author.username + '_character.json...');
-					});
+					console.log('Reading contents to ' + msg.author.username + '_character.json...');
 					msg.reply('Processed read character: ' + characterJson);
+				});
+			}
+
+			// !c weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
+			if (msgAry.length >= 2 && ATTACK_REGEX.test(originalMsg)) {
+
+				fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+					character = JSON.parse(data)
+					if (character && character.weapons != null && character.weapons.length > 0) {
+						for (let weapon of character.weapons) {
+							if (weapon && weapon.attack && DICE_REGEX.test(weapon.attack)) {
+								// Expect a dice format of XdY +/- Z where X, Y, and Z are real numbers
+								let weaponAttackStrAry = weapon.attack.split('');
+								if (weaponAttackStrAry[0].toUpperCase() === 'D') {
+									// Has single dice roll
+									let numberOfEdges = weaponAttackStrAry[1];
+									let extraValue = 0;
+									let operation = null;
+									if (weaponAttackStrAry.length >= 6) {
+										extraValue = parseInt(weaponAttackStrAry[3]);
+										operation = weaponAttackStrAry[2];
+									}
+									let roll = rollDice(numberOfEdges);
+				
+									let extraValueStr = '';
+									if (weaponAttackStrAry.length >= 6 && operation) {
+										extraValueStr = getExtraValue(roll, extraValue, operation);
+									}
+									msg.reply('Attack Result: ' + roll + extraValueStr);
+								} else if (weaponAttackStrAry.length >= 3 && weaponAttackStrAry[1].toUpperCase() === 'D') {
+									// Has multiple dice rolls
+									let numberOfRolls = weaponAttackStrAry[0];
+									let numberOfEdges = weaponAttackStrAry[2];
+									let extraValue = 0;
+									let operation = null;
+									if (weaponAttackStrAry.length >= 5) {
+										extraValue = parseInt(weaponAttackStrAry[4]);
+										operation = weaponAttackStrAry[3];
+									}
+									let total = 0;
+									let finalMsg = '';
+									for (let index = 0; index < numberOfRolls; index++) {		
+										let roll = rollDice(numberOfEdges);
+				
+										let extraValueStr = '';
+										if (weaponAttackStrAry.length >= 4 && operation) {
+											extraValueStr = getExtraValue(roll, extraValue, operation);
+										}
+										total = (total + roll + extraValue);
+										finalMsg += '[' + roll + extraValueStr + '] ';
+									}
+									msg.reply('Attack Result(s): ' + finalMsg.trim() + ' with total: ' + total);
+								} else {
+									msg.reply('Unable to find attack field on weapon...');
+								}
+							} else {
+								msg.reply('Unable to find weapon...');
+							}
+						}
+					}
+				});
+			}
+
+			// !c armor=[{name:"Thor's Hammer",defense:"3d4"},{name:"Odin's Spear",defense:"d8 + 1"}]
+			if (msgAry.length >= 2 && DEFEND_REGEX.test(originalMsg)) {
+
+				fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+					character = JSON.parse(data)
+					if (character && character.armor != null && character.armor.length > 0) {
+						for (let selectedArmor of character.armor) {
+							if (selectedArmor && selectedArmor.defense && DICE_REGEX.test(selectedArmor.defense)) {
+								console.log(selectedArmor);
+								// Expect a dice format of XdY +/- Z where X, Y, and Z are real numbers
+								let armorDefStrAry = selectedArmor.defense.split('');
+								if (armorDefStrAry[0].toUpperCase() === 'D') {
+									// Has single dice roll
+									let numberOfEdges = armorDefStrAry[1];
+									let extraValue = 0;
+									let operation = null;
+									if (armorDefStrAry.length >= 6) {
+										extraValue = parseInt(armorDefStrAry[3]);
+										operation = armorDefStrAry[2];
+									}
+									let roll = rollDice(numberOfEdges);
+				
+									let extraValueStr = '';
+									if (armorDefStrAry.length >= 6 && operation) {
+										extraValueStr = getExtraValue(roll, extraValue, operation);
+									}
+									msg.reply('Defend Result: ' + roll + extraValueStr);
+								} else if (armorDefStrAry.length >= 3 && armorDefStrAry[1].toUpperCase() === 'D') {
+									// Has multiple dice rolls
+									let numberOfRolls = armorDefStrAry[0];
+									let numberOfEdges = armorDefStrAry[2];
+									let extraValue = 0;
+									let operation = null;
+									if (armorDefStrAry.length >= 5) {
+										extraValue = parseInt(armorDefStrAry[4]);
+										operation = armorDefStrAry[3];
+									}
+									let total = 0;
+									let finalMsg = '';
+									for (let index = 0; index < numberOfRolls; index++) {		
+										let roll = rollDice(numberOfEdges);
+				
+										let extraValueStr = '';
+										if (armorDefStrAry.length >= 4 && operation) {
+											extraValueStr = getExtraValue(roll, extraValue, operation);
+										}
+										total = (total + roll + extraValue);
+										finalMsg += '[' + roll + extraValueStr + '] ';
+									}
+									msg.reply('Defend Result(s): ' + finalMsg.trim() + ' with total: ' + total);
+								} else {
+									msg.reply('Unable to find defend field on armor...');
+								}
+							} else {
+								msg.reply('Unable to find armor...');
+							}
+						}
+					}
 				});
 			}
 		}
@@ -181,4 +277,26 @@ let parseContents = function(character, originalMsg) {
 		}
 	}
 	return character;
+}
+
+let rollDice = function(numberOfEdges) {
+	let totalTimeInMS = new Date().getTime();
+	let randomNumber = Math.random();
+	let randomNumberTwo = Math.random();
+	let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
+	return roll;			
+}
+
+let getExtraValue = function(roll, extraValue, operation) {
+	let extraValueStr = '';
+	if (operation === '+') {
+		extraValueStr = ' + ' + extraValue + ' equals: ' + (roll + extraValue);
+	} else if (operation === '-') {
+		extraValueStr = ' - ' + extraValue + ' equals: ' + (roll - extraValue);
+	} else if (operation === '/') {
+		extraValueStr = ' / ' + extraValue + ' equals: ' + (roll / extraValue);
+	} else if (operation === '*') {
+		extraValueStr = ' * ' + extraValue + ' equals: ' + (roll * extraValue);
+	}
+	return extraValueStr;
 }

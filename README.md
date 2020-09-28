@@ -15,10 +15,18 @@ Overview of commands:
 
 - Show Character Sheet: !s
 
+- Attack with character weapons: !attack
+-- Note that the character sheet must have a weapons array in a similiar JSON array format:
+-- weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
+
+- Defend with character armor: !defend
+-- Note that the character sheet must have a armor array in a similiar JSON array format:
+-- armor=[{name:"Thor's Hammer",defense:"3d4"},{name:"Odin's Spear",defense:"d8 + 1"}]
+
 ## Tech Stack 
 - NodeJS 
 - DotEnv
-- DiscordJS
+- DiscordJS (GitHub: https://github.com/discordjs/discord.js)
 
 ## Author
 Nathanial W. Heard
