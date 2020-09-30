@@ -17,9 +17,9 @@ Overview of commands:
 - Show Character Sheet: !s
 
 - Attack with character weapons: !attack
- - Will roll your character's weapons after a hit dice roll is made, default 1d20
- - The hit dice can be changed by setting the character's system: !u system="2d20"
- - Note that the character sheet must have a weapons array in a similiar JSON array format:
+    - Will roll your character's weapons after a hit dice roll is made, default 1d20
+  - The hit dice can be changed by setting the character's system: !u system="2d20"
+    - Note that the character sheet must have a weapons array in a similiar JSON array format:
  - Add weapons to character: Iu weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
  - Add attributes to alter hit roll for character attack: !u attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"}] 
 
