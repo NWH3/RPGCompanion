@@ -38,6 +38,10 @@ module.exports = {
                 var character = {};
                 if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'U' && CREATE_COMMAND_REGEX.test(originalMsg)) {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+                        if (!data) {
+                            msg.reply('Unable to find character data...');
+                            return;
+                        }
                         character = JSON.parse(data)
                         character = parseContents(character, originalMsg)
                 
@@ -69,6 +73,10 @@ module.exports = {
                     msg.reply('Processed delete character: ' + characterJson);
                 } else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'S') {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+                        if (!data) {
+                            msg.reply('Unable to find character data...');
+                            return;
+                        }
                         character = JSON.parse(data)
                         let characterJson = JSON.stringify(character);
                         console.log('Reading contents to ' + msg.author.username + '_character.json...');
@@ -80,6 +88,10 @@ module.exports = {
                 if (msgAry.length >= 2 && ATTACK_REGEX.test(originalMsg)) {
 
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+                        if (!data) {
+                            msg.reply('Unable to find character data...');
+                            return;
+                        }
                         character = JSON.parse(data);
                         if (character && character.weapons != null && character.weapons.length > 0) {
                             // Roll hit dice first and add modifier
@@ -116,7 +128,11 @@ module.exports = {
                 if (msgAry.length >= 2 && DEFEND_REGEX.test(originalMsg)) {
 
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
-                        let character = JSON.parse(data);
+                        if (!data) {
+                            msg.reply('Unable to find character data...');
+                            return;
+                        }
+                        character = JSON.parse(data);
                         if (character && character.armor != null && character.armor.length > 0) {
                             // Roll hit dice first and add modifier
                             let defendStatMod = 0;
