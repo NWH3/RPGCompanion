@@ -76,7 +76,7 @@ module.exports = {
                     });
                 }
 
-                // !c  attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"}] weapons=[{name:"Thor's Hammer",attack:"2d6",mod:"STR"},{name:"Odin's Spear",attack:"d10 + 3",mod:"STR"}]
+                // !c  attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"}] weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
                 if (msgAry.length >= 2 && ATTACK_REGEX.test(originalMsg)) {
 
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
@@ -112,7 +112,7 @@ module.exports = {
                     });
                 }
 
-                // !c system="2d20" attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"},{name:"AGI",value:"14",mod:"-2",isDefendStat:"true"}] armor=[{name:"Thor's Hammer",defense:"3d4",mod:"STR"},{name:"Odin's Spear",defense:"d8 + 1",mod:"STR"}]
+                // !c system="2d20" attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"},{name:"AGI",value:"14",mod:"-2",isDefendStat:"true"}] armor=[{name:"Armor",defense:"3d4"}]
                 if (msgAry.length >= 2 && DEFEND_REGEX.test(originalMsg)) {
 
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
