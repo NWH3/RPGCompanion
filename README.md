@@ -1,7 +1,20 @@
 ## RPGCompanion
 RPGCompanion is a Discord Bot designed to help players by simplifying some of the tedious actions. Once RPGCOmpanion has been installed on your Discord Server you will be able to roll dice, create character sheets, manage items, and perform character actions with dynamic results. 
 
-Overview of commands:
+## Tech Stack 
+- NodeJS (v10.19.0)
+- DotEnv (GitHub: https://github.com/motdotla/dotenv)
+- DiscordJS (GitHub: https://github.com/discordjs/discord.js)
+- qrandom (GitHub: https://github.com/mario-rggj/qrandom#readme)
+
+## Build & Run
+You will need to have npm and NodeJS version 10.18.0 or greater installed on your machine. Then run the following commands.
+
+- Install all depdencies: npm install
+
+- Run bot: node index.js
+
+## RPGCompanion Commands:
 
 - Roll Dice: !r YdX where Y and X are some real numbers, Examples: !r 1d6 or !r d6
 
@@ -29,10 +42,7 @@ Overview of commands:
     - Add armor to character: !u armor=[{name:"Thor's Hammer",defense:"3d4"},{name:"Odin's Spear",defense:"d8 + 1"}]
     - Add attributes to alter hit roll for character defend: !u attributes=[{name:"AGI",value:"14",mod:"-4",isDefendStat:"true"}] 
 
-## Tech Stack 
-- NodeJS 
-- DotEnv
-- DiscordJS (GitHub: https://github.com/discordjs/discord.js)
+
 
 ## Author
 Nathanial W. Heard

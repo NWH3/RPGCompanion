@@ -5,19 +5,19 @@
  * @author Nathanial W. Heard
  */
 // Imports
-let fs = require('fs');
-
+const fs = require('fs');
+const quantumRandom = require('qrandom');
 
 // Regex validation for commands
-let DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
-let CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
-let DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
-let ATTACK_REGEX = /^!(attack|atk|attk)[\s]*$/i;
-let DEFEND_REGEX = /^!(defend|defense|def)[\s]*$/i;
+const DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
+const CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
+const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
+const ATTACK_REGEX = /^!(attack|atk|attk)[\s]*$/i;
+const DEFEND_REGEX = /^!(defend|defense|def)[\s]*$/i;
  
 module.exports = {
     // Main logic flow to process commands
-    processRPGCompanionCommand: function(msg) {
+    processRPGCompanionCommand: async function(msg) {
         try {
             // If message starts with !, attempt to process it
             if (msg.content.startsWith('!')) {
@@ -26,7 +26,7 @@ module.exports = {
 
                 // Valid dice commands !r 2d6 +/- X, where X is some number
                 if (originalMsg.startsWith('!r') &&  DICE_COMMAND_REGEX.test(originalMsg)) {
-                    let response = parseDiceCommandAndGetRoll(originalMsg, msgAry[2]);
+                    let response = await parseDiceCommandAndGetRoll(originalMsg, msgAry[2]);
                     if (response) {
                         msg.reply(response);
                     } else {
@@ -87,7 +87,7 @@ module.exports = {
                 // !c  attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"}] weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
                 if (msgAry.length >= 2 && ATTACK_REGEX.test(originalMsg)) {
 
-                    fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+                    fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
                         if (!data) {
                             msg.reply('Unable to find character data...');
                             return;
@@ -110,7 +110,7 @@ module.exports = {
                                     // Expect a dice format of XdY +/- Z where X, Y, and Z are real numbers
                                     let weaponAttackStr = weapon.attack;
                                     let weaponAttackCharAry = weapon.attack.replace(/\s/g,'').split('');
-                                    let response = parseDiceCommandAndGetRoll(weaponAttackStr, weaponAttackCharAry[0]);
+                                    let response = await parseDiceCommandAndGetRoll(weaponAttackStr, weaponAttackCharAry[0]);
                                     if (response) {
                                         msg.reply('Attack ' + response);
                                     } else {
@@ -127,7 +127,7 @@ module.exports = {
                 // !c system="2d20" attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"},{name:"AGI",value:"14",mod:"-2",isDefendStat:"true"}] armor=[{name:"Armor",defense:"3d4"}]
                 if (msgAry.length >= 2 && DEFEND_REGEX.test(originalMsg)) {
 
-                    fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
+                    fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
                         if (!data) {
                             msg.reply('Unable to find character data...');
                             return;
@@ -150,7 +150,7 @@ module.exports = {
                                     // Expect a dice format of XdY +/- Z where X, Y, and Z are real numbers
                                     let armorDefStr = selectedArmor.defense;
                                     let armorDefCharAry = selectedArmor.defense.replace(/\s/g,'').split('');
-                                    let response = parseDiceCommandAndGetRoll(armorDefStr, armorDefCharAry[0]);
+                                    let response = await parseDiceCommandAndGetRoll(armorDefStr, armorDefCharAry[0]);
                                     if (response) {
                                         msg.reply('Defend ' + response);
                                     } else {
@@ -170,12 +170,12 @@ module.exports = {
     }
 };
 
-let rollHitDice = function(character, msg, hitStatMod) {
+let rollHitDice = async function(character, msg, hitStatMod) {
     if (character.system) {
         // Read in character.system field's dice format
         let chrSystem = character.system;
         let chrSystemCharAry = character.system.replace(/\s/g,'').split('');
-        let hitRes = parseDiceCommandAndGetRoll(chrSystem, chrSystemCharAry[0], hitStatMod);
+        let hitRes = await parseDiceCommandAndGetRoll(chrSystem, chrSystemCharAry[0], hitStatMod);
         if (hitRes) {
             msg.reply('Hit ' + hitRes);
         } else {
@@ -183,7 +183,7 @@ let rollHitDice = function(character, msg, hitStatMod) {
         }
     } else {
         // Default is 1d20
-        let hitRoll = rollDice(20);
+        let hitRoll = await rollDice(20);
         msg.reply('Hit Roll (1d20): ' + hitRoll + ' mod ' + hitStatMod + ' equals ' + (hitRoll + hitStatMod));
     }
 }
@@ -232,7 +232,7 @@ let parseContents = function(character, originalMsg) {
 	return character;
 }
 
-let parseDiceCommandAndGetRoll = function(originalMsg, firstLetterInMsg, mod) {
+let parseDiceCommandAndGetRoll = async function(originalMsg, firstLetterInMsg, mod) {
     let response = null;
     let posOffset = 0;
     let originalMsgAry = originalMsg.split(' ');
@@ -254,7 +254,7 @@ let parseDiceCommandAndGetRoll = function(originalMsg, firstLetterInMsg, mod) {
             extraValue += parseInt(originalMsgAry[posOffset+3]);
             operation = originalMsgAry[posOffset+2];
         }
-        let roll = rollDice(numberOfEdges);
+        let roll = await rollDice(numberOfEdges);
 
         let extraValueStr = '';
         if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) && operation) {
@@ -277,7 +277,7 @@ let parseDiceCommandAndGetRoll = function(originalMsg, firstLetterInMsg, mod) {
         let total = 0;
         let finalMsg = '';
         for (let index = 0; index < numberOfRolls; index++) {	
-            let roll = rollDice(numberOfEdges);
+            let roll = await rollDice(numberOfEdges);
 
             let extraValueStr = '';
             if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) && operation) {
@@ -298,12 +298,30 @@ let parseDiceCommandAndGetRoll = function(originalMsg, firstLetterInMsg, mod) {
     return response;
 }
 
-let rollDice = function(numberOfEdges) {
-	let totalTimeInMS = new Date().getTime();
-	let randomNumber = Math.random();
-	let randomNumberTwo = Math.random();
-	let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
-	return parseInt(roll);			
+let rollDice = async function(numberOfEdges) {
+    return await quantumRandom('uint16', 10, 10)
+        .then(data => {
+            let randomNumber = parseInt(data[0]);
+            let randomNumberTwo = parseInt(data[1]);
+
+            let roll = Math.floor((randomNumber + randomNumberTwo) % numberOfEdges) + 1;
+            roll = parseInt(roll);
+            return roll;
+        })
+        .catch(error => {
+            console.error('Unable to read quantum numbers with error: ' + error);
+            return rollPsuedoRandom(numberOfEdges);
+        });
+}
+
+let rollPsuedoRandom = function(numberOfEdges) {
+    let totalTimeInMS = new Date().getTime();
+    let randomNumber = parseInt(Math.random());
+    let randomNumberTwo = parseInt(Math.random());
+
+    let roll = Math.floor(((totalTimeInMS * randomNumber) + randomNumberTwo) % numberOfEdges) + 1;
+    roll = parseInt(roll);
+    return roll;
 }
 
 let getExtraValueStr = function(roll, extraValue, operation) {
