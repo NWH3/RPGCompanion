@@ -42,7 +42,10 @@ You will need to have npm and NodeJS version 10.18.0 or greater installed on you
     - Add armor to character: !u armor=[{name:"Thor's Hammer",defense:"3d4"},{name:"Odin's Spear",defense:"d8 + 1"}]
     - Add attributes to alter hit roll for character defend: !u attributes=[{name:"AGI",value:"14",mod:"-4",isDefendStat:"true"}] 
 
-
+- Save, load, and update emoji battle maps (Word limit 2000 due to Discord, Custom emojis are still outstanding)
+    - !map mapName=listOfEmojiTexts,listOfEmojiTexts,listOfEmojiTexts players=name|emojiText|x:y,name2|emojiText|x:y
+    - !move mapName name|x:y
+    - !summon mapName name|emojiText|x:y
 
 ## Author
 Nathanial W. Heard

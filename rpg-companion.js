@@ -14,7 +14,11 @@ const CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-
 const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
 const ATTACK_REGEX = /^!(attack|atk|attk)[\s]*$/i;
 const DEFEND_REGEX = /^!(defend|defense|def)[\s]*$/i;
- 
+const MAP_LOAD_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+load=[A-Za-z0-9\,\.\_]+(\s)*$/i;
+const MAP_SAVE_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+[A-Za-z0-9]+=([A-Za-z0-9\_\:\-\.]+[\,]*(\n)*)+((\s)+(players|characters)\=([A-Za-z0-9\.\_]+\|[A-Za-z0-9\.\_]+\|[0-9]+\:[0-9]+(\,)*)+)?$/i;
+const MAP_MOVE_REGEX = /^!(move|mv|mov|moves)[\s]+[A-Za-z0-9\.\_]+[\s]+([A-Za-z0-9\.\_]+\|[0-9]+:[0-9]+(\s)*(\,)*)+$/i;
+const MAP_SUMMON_REGEX = /^!(summon|sum)[\s]+[A-Za-z0-9\,\.\_]+[\s]+([A-Za-z0-9\.\_]+\|[A-Za-z0-9\.\_]+\|[0-9]+:[0-9]+(\s)*(\,)*)+$/i;
+
 module.exports = {
     // Main logic flow to process commands
     processRPGCompanionCommand: async function(msg) {
@@ -28,10 +32,20 @@ module.exports = {
                 if (originalMsg.startsWith('!r') &&  DICE_COMMAND_REGEX.test(originalMsg)) {
                     let response = await parseDiceCommandAndGetRoll(originalMsg, msgAry[2]);
                     if (response) {
-                        msg.reply(response);
+                        msg.channel.send(response);
                     } else {
-                        msg.reply('Unable to parse dice command with contents: ' + originalMsg);
+                        msg.channel.send('Unable to parse dice command with contents: ' + originalMsg);
                     }
+                }
+
+                if (originalMsg.startsWith('!map') &&  MAP_LOAD_REGEX.test(originalMsg)) {
+                    parseCommandAndLoadMap(msg, originalMsg);
+                } else if (originalMsg.startsWith('!map') &&  MAP_SAVE_REGEX.test(originalMsg)) {
+                    parseCommandAndSaveMap(msg, originalMsg);
+                } else if (originalMsg.startsWith('!move') &&  MAP_MOVE_REGEX.test(originalMsg)) {
+                    parseCommandAndMovePlayerOnMap(msg, originalMsg);
+                } else if (originalMsg.startsWith('!summon') &&  MAP_SUMMON_REGEX.test(originalMsg)) {
+                    parseCommandAndSummonPlayerOnMap(msg, originalMsg);
                 }
 
                 // Valid create character commands !c fieldOne="value one" fieldTwo={name:"a1",attack:"a1"} fieldArray=[{name:"a",attack:"a"},{name:"b",attack:"b"}]
@@ -39,7 +53,7 @@ module.exports = {
                 if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'U' && CREATE_COMMAND_REGEX.test(originalMsg)) {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
                         if (!data) {
-                            msg.reply('Unable to find character data...');
+                            msg.channel.send('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data)
@@ -52,7 +66,7 @@ module.exports = {
                             }
                             console.log('Updated contents to ' + msg.author.username + '_characters.json...');
                         });
-                        msg.reply('Processed update character: ' + characterJson);
+                        msg.channel.send('Processed update character: ' + characterJson);
                     });
                 } else if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'C' && CREATE_COMMAND_REGEX.test(originalMsg)) {
                     character = parseContents(character, originalMsg)
@@ -64,23 +78,23 @@ module.exports = {
                         }
                         console.log('Wrote contents to ' + msg.author.username + '_character.json...');
                     });
-                    msg.reply('Processed create character: ' + characterJson);
+                    msg.channel.send('Processed create character: ' + characterJson);
                 } else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'D') {
                     character = parseContents(character, originalMsg)
                 
                     let characterJson = JSON.stringify(character);
                     fs.unlinkSync(msg.author.username + '_character.json');
-                    msg.reply('Processed delete character: ' + characterJson);
+                    msg.channel.send('Processed delete character: ' + characterJson);
                 } else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'S') {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
                         if (!data) {
-                            msg.reply('Unable to find character data...');
+                            msg.channel.send('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data)
                         let characterJson = JSON.stringify(character);
                         console.log('Reading contents to ' + msg.author.username + '_character.json...');
-                        msg.reply('Processed read character: ' + characterJson);
+                        msg.channel.send('Processed read character: ' + characterJson);
                     });
                 }
 
@@ -89,7 +103,7 @@ module.exports = {
 
                     fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
                         if (!data) {
-                            msg.reply('Unable to find character data...');
+                            msg.channel.send('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data);
@@ -112,12 +126,12 @@ module.exports = {
                                     let weaponAttackCharAry = weapon.attack.replace(/\s/g,'').split('');
                                     let response = await parseDiceCommandAndGetRoll(weaponAttackStr, weaponAttackCharAry[0]);
                                     if (response) {
-                                        msg.reply('Attack ' + response);
+                                        msg.channel.send('Attack ' + response);
                                     } else {
-                                        msg.reply('Unable to parse weapon dice command with contents: ' + JSON.stringify(weapon));
+                                        msg.channel.send('Unable to parse weapon dice command with contents: ' + JSON.stringify(weapon));
                                     }
                                 } else {
-                                    msg.reply('Unable to find weapon...');
+                                    msg.channel.send('Unable to find weapon...');
                                 }
                             }
                         }
@@ -129,7 +143,7 @@ module.exports = {
 
                     fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
                         if (!data) {
-                            msg.reply('Unable to find character data...');
+                            msg.channel.send('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data);
@@ -152,12 +166,12 @@ module.exports = {
                                     let armorDefCharAry = selectedArmor.defense.replace(/\s/g,'').split('');
                                     let response = await parseDiceCommandAndGetRoll(armorDefStr, armorDefCharAry[0]);
                                     if (response) {
-                                        msg.reply('Defend ' + response);
+                                        msg.channel.send('Defend ' + response);
                                     } else {
-                                        msg.reply('Unable to parse armor dice command with contents: ' + JSON.stringify(selectedArmor));
+                                        msg.channel.send('Unable to parse armor dice command with contents: ' + JSON.stringify(selectedArmor));
                                     }
                                 } else {
-                                    msg.reply('Unable to find armor...');
+                                    msg.channel.send('Unable to find armor...');
                                 }
                             }
                         }
@@ -177,14 +191,14 @@ let rollHitDice = async function(character, msg, hitStatMod) {
         let chrSystemCharAry = character.system.replace(/\s/g,'').split('');
         let hitRes = await parseDiceCommandAndGetRoll(chrSystem, chrSystemCharAry[0], hitStatMod);
         if (hitRes) {
-            msg.reply('Hit ' + hitRes);
+            msg.channel.send('Hit ' + hitRes);
         } else {
-            msg.reply('Unable to parse hit dice command with contents: ' + JSON.stringify(character.system));
+            msg.channel.send('Unable to parse hit dice command with contents: ' + JSON.stringify(character.system));
         }
     } else {
         // Default is 1d20
         let hitRoll = await rollDice(20);
-        msg.reply('Hit Roll (1d20): ' + hitRoll + ' mod ' + hitStatMod + ' equals ' + (hitRoll + hitStatMod));
+        msg.channel.send('Hit Roll (1d20): ' + hitRoll + ' mod ' + hitStatMod + ' equals ' + (hitRoll + hitStatMod));
     }
 }
 
@@ -353,14 +367,228 @@ let getRollWithExtraAndOperator = function(roll, extraValue, operation) {
 	return parseInt(result);
 }
 
-let getCharacterMod = function(item, character) {
-	if (character.attributes) {
-		for (let attribute of character.attributes) {
-			if (attribute.name && item.mod && attribute.name === item.mod) {
-				let modValue = parseInt(attribute.mod);
-				return modValue;
-			}
-		}
-	}
-	return 0;
+// !map testmap=green_square,green_square,green_square,green_square,green_square
+// green_square,green_square,green_square,green_square,green_square
+// green_square,green_square,green_square,green_square,green_square
+// green_square,green_square,green_square,green_square,green_square
+// green_square,green_square,green_square,green_square,green_square players=guard1|japanese_ogre|1:1,guard2|japanese_ogre|2:3
+let parseCommandAndSaveMap = async function(msg, originalMsg) {
+    let originalMsgAry = originalMsg.split(' ');
+    // Part 1) !map 2) name=mapOfEmojis 3) players=guard1|img|1:1,guard2|img|1:1
+    let mapParts = originalMsgAry[1].split('=');
+    let name = mapParts[0];
+    let mapDataRaw = mapParts[1];
+    let mapDataRows = mapDataRaw.split('\n');
+
+    let players = {};
+    let playersToSave = {};
+    if (originalMsgAry.length >= 3) {
+        let playerParts = originalMsgAry[2].split('=');
+        // guard1|img|1:1
+        let playersArray = playerParts[1].split(',');
+        for (let player of playersArray) {
+            let playerParts = player.split('|');
+            let name = playerParts[0];
+            let emoji = playerParts[1];
+            let xAndy = playerParts[2];
+            players[xAndy] = {name: name, emoji: emoji, xy: xAndy};
+            playersToSave[name] = {name: name, emoji: emoji, xy: xAndy};
+        }
+    }
+
+    let jsonMapDataMtx = [];
+    let rowCount = 0;
+    for (let row of mapDataRows) {
+        let mapDataColumns = row.split(',');
+        let columnCount = 0;
+        jsonMapDataMtx[rowCount] = [];
+        for (let column of mapDataColumns) {
+            jsonMapDataMtx[rowCount][columnCount] = column;
+            columnCount++;
+        }
+        rowCount++;
+    }
+
+    // Load and save maps
+    fs.readFile('maps.json', 'utf8', function(err, data) {
+        let maps = {};
+        if (data) {
+            maps = JSON.parse(data);
+            if (!maps) {
+                maps = {};
+            }
+        }
+        maps[name] = { players: playersToSave, map: jsonMapDataMtx };
+
+        let mapsJson = JSON.stringify(maps);
+        fs.writeFile('maps.json', mapsJson, function (err) {
+            if (err){
+                return console.log(err);
+            }
+            console.log('Updated contents to maps.json by ' + msg.author.username + '...');
+        });
+        msg.channel.send(displayMap(jsonMapDataMtx, players));
+        
+    });
+}
+
+let displayMap = function(mapsJson, players) {
+    let mapToRender = '--';
+    let columnCount = 0;
+    for (let key in mapsJson) {
+        let row = mapsJson[key];
+        let rowCount = 0;   
+        if (columnCount == 0) {
+            // Add numbers
+            let count = 0;
+            mapToRender += '\t';
+            for (let key in row) {
+                if (count >= 9) {
+                    mapToRender += count + '  ';
+                } else {
+                    mapToRender += count + '\t';
+                }
+                count++;
+            }
+            mapToRender += '\n';
+        }
+
+        if (columnCount == 1) {
+            mapToRender += ' ';
+        }
+        if (columnCount > 9) {
+            mapToRender += columnCount + '  ';
+        } else {
+            mapToRender += columnCount + '\t';
+        }
+        for (let key in row) {
+            let value = row[key];
+            let xAndy = columnCount + ":" + rowCount;
+            let finalValue = value;
+            if (players && players[xAndy]) {
+                finalValue = players[xAndy].emoji;
+            }
+            mapToRender += ':' + finalValue + ':';
+            rowCount++;
+        }
+        mapToRender += '\n';
+        columnCount++;
+    }
+    return mapToRender;
+}
+
+let parseCommandAndLoadMap = async function(msg, originalMsg) {
+    let originalMsgAry = originalMsg.split(' ');
+    // Part 1) !map 2) load=name
+    let nameParts = originalMsgAry[1].split('=');
+    let name = nameParts[1];
+    
+    // Load and save maps
+    fs.readFile('maps.json', 'utf8', function(err, data) {
+        let maps = {};
+        if (!data) {
+            console.log('Unable to load map data for user: ' + msg.author.username);
+            return;
+        } else {
+            maps = JSON.parse(data);
+        }
+
+        if (!maps[name]) {
+            msg.channel.send('No map by the given name: ' + name);
+        } else {
+            msg.channel.send(displayMap(maps[name].map, maps[name].players));
+        }
+    });
+}
+
+let parseCommandAndMovePlayerOnMap = async function(msg, originalMsg) {
+    let originalMsgAry = originalMsg.split(' ');
+    // Part 1) !move 2) testmap 3)guard1|1:2,guard1|1:2
+    let name = originalMsgAry[1];
+    
+    // Load and save maps
+    fs.readFile('maps.json', 'utf8', function(err, data) {
+        let maps = {};
+        if (!data) {
+            console.log('Unable to load map data for user: ' + msg.author.username);
+            return;
+        } else {
+            maps = JSON.parse(data);
+        }
+
+        if (!maps[name]) {
+            msg.channel.send('No map by the given name: ' + name);
+        } else {
+            let playersToUpdate = originalMsgAry[2].split(',');
+            for (let player of playersToUpdate) {
+                let playerParts = player.split('|');
+                let playerName = playerParts[0];
+                let xAndy = playerParts[1];
+                let emoji = maps[name].players[playerName].emoji;
+                maps[name].players[playerName] = {name: playerName, emoji: emoji, xy: xAndy};
+            }
+
+            let movedPlayers = {};
+            for (let key in maps[name].players) {
+                let player = maps[name].players[key];
+                movedPlayers[player.xy] = player; 
+            }
+
+            maps[name] = { players: maps[name].players, map: maps[name].map};
+            let mapsJson = JSON.stringify(maps);
+            fs.writeFile('maps.json', mapsJson, function (err) {
+                if (err){
+                    return console.log(err);
+                }
+                console.log('Updated contents to maps.json by ' + msg.author.username + '...');
+            });
+            msg.channel.send(displayMap(maps[name].map, movedPlayers));
+        }
+    });
+}
+
+let parseCommandAndSummonPlayerOnMap = async function(msg, originalMsg) {
+    let originalMsgAry = originalMsg.split(' ');
+    // Part 1) !summon 2) testmap 3)guard1|emoji|1:2,guard1|emoji|1:2
+    let name = originalMsgAry[1];
+    
+    // Load and save maps
+    fs.readFile('maps.json', 'utf8', function(err, data) {
+        let maps = {};
+        if (!data) {
+            console.log('Unable to load map data for user: ' + msg.author.username);
+            return;
+        } else {
+            maps = JSON.parse(data);
+        }
+
+        if (!maps[name]) {
+            msg.channel.send('No map by the given name: ' + name);
+        } else {
+            let playersToUpdate = originalMsgAry[2].split(',');
+            for (let player of playersToUpdate) {
+                let playerParts = player.split('|');
+                let playerName = playerParts[0];
+                let emoji = playerParts[1];
+                let xAndy = playerParts[2];
+                maps[name].players[playerName] = {name: playerName, emoji: emoji, xy: xAndy};
+            }
+
+            let movedPlayers = {};
+            for (let key in maps[name].players) {
+                let player = maps[name].players[key];
+                movedPlayers[player.xy] = player; 
+            }
+
+            maps[name] = { players: maps[name].players, map: maps[name].map};
+            let mapsJson = JSON.stringify(maps);
+            fs.writeFile('maps.json', mapsJson, function (err) {
+                if (err){
+                    return console.log(err);
+                }
+                console.log('Updated contents to maps.json by ' + msg.author.username + '...');
+            });
+            msg.channel.send(displayMap(maps[name].map, movedPlayers));
+        }
+    });
 }
