@@ -13,9 +13,9 @@ const fs = require('fs');
 const quantumRandom = require('qrandom');
 
 // Regex validation for commands
-const DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
+const DICE_COMMAND_REGEX = /^!r[\s]+[0-9]*[dD][0-9]+([\s]*[\+\-\*\/][\s]*([0-9]*d)?[0-9]*)*[\s]*$/;
+const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+([\s]*[\+\-\*\/][\s]*([0-9]*d)?[0-9]*)*[\s]*$/;
 const CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
-const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
 const ATTACK_REGEX = /^!(attack|atk|attk)([\s]+(\-)?[0-9]+)?[\s]*$/i;
 const DEFEND_REGEX = /^!(defend|defense|def)([\s]+(\-)?[0-9]+)?([\s]+[0-9]+)?[\s]*$/i;
 const MAP_LOAD_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+load=[A-Za-z0-9\,\.\_]+(\s)*$/i;
@@ -65,7 +65,7 @@ module.exports = {
                             return;
                         }
                         character = JSON.parse(data)
-                        character = parseContents(character, originalMsg)
+                        character = parseCharacterContents(character, originalMsg)
                 
                         let characterJson = JSON.stringify(character);
                         fs.writeFile(msg.author.username + '_character.json', characterJson, function (err) {
@@ -77,7 +77,7 @@ module.exports = {
                         msg.reply('Processed update character: ' + characterJson);
                     });
                 } else if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'C' && CREATE_COMMAND_REGEX.test(originalMsg)) {
-                    character = parseContents(character, originalMsg)
+                    character = parseCharacterContents(character, originalMsg)
                 
                     let characterJson = JSON.stringify(character);
                     fs.writeFile(msg.author.username + '_character.json', characterJson, function (err) {
@@ -88,7 +88,7 @@ module.exports = {
                     });
                     msg.reply('Processed create character: ' + characterJson);
                 } else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'D') {
-                    character = parseContents(character, originalMsg)
+                    character = parseCharacterContents(character, originalMsg)
                 
                     let characterJson = JSON.stringify(character);
                     fs.unlinkSync(msg.author.username + '_character.json');
@@ -122,7 +122,7 @@ module.exports = {
                         character = JSON.parse(data);
                         if (character && character.weapons != null && character.weapons.length > 0) {
                             // Roll hit dice first and add modifier
-                            rollHitDice(character, msg, mod, character.weapons.length);
+                            await rollHitDice(character, msg, mod, character.weapons.length);
 
                             for (let weapon of character.weapons) {
                                 if (weapon && weapon.name && weapon.attack && DICE_REGEX.test(weapon.attack)) {
@@ -131,7 +131,7 @@ module.exports = {
                                     let weaponAttackCharAry = weapon.attack.replace(/\s/g,'').split('');
                                     let response = await parseDiceCommandAndGetRoll(weaponAttackStr, weaponAttackCharAry[0]);
                                     if (response) {
-                                        msg.channel.send('Attack ' + response);
+                                        msg.reply('Attack ' + response);
                                     } else {
                                         msg.reply('Unable to parse weapon dice command with contents: ' + JSON.stringify(weapon));
                                     }
@@ -165,7 +165,7 @@ module.exports = {
                         character = JSON.parse(data);
                         if (character && character.armor != null && character.armor.length > 0) {
                             // Roll hit dice first and add modifier
-                            rollHitDice(character, msg, mod, dodgeRollCount);
+                            await rollHitDice(character, msg, mod, dodgeRollCount);
 
                             for (let selectedArmor of character.armor) {
                                 if (selectedArmor && selectedArmor.defense && DICE_REGEX.test(selectedArmor.defense)) {
@@ -212,7 +212,7 @@ let rollHitDice = async function(character, msg, hitStatMod, numberOfHitRolls) {
     }
 }
 
-let parseContents = function(character, originalMsg) {
+let parseCharacterContents = function(character, originalMsg) {
 	let originalMsgAry = originalMsg.split(/[\"\}\]][\s]+|\![A-Za-z]\s/);
 	for (let pos = 1; pos < originalMsgAry.length; pos++) {
 		// Skip first position and start at 1
@@ -256,6 +256,7 @@ let parseContents = function(character, originalMsg) {
 	return character;
 }
 
+// !r d20 + 1, !r 2d20 - 1, !r d20 + d4
 let parseDiceCommandAndGetRoll = async function(originalMsg, firstLetterInMsg, mod) {
     let response = null;
     let posOffset = 0;
@@ -274,7 +275,25 @@ let parseDiceCommandAndGetRoll = async function(originalMsg, firstLetterInMsg, m
         let numberOfEdges = originalMsgAry[posOffset+1].replace(/[Dd]/g, '');
         let extraValue = mod;
         let operation = null;
-        if (originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) {
+        if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0))
+            && originalMsgAry[posOffset+3].toUpperCase().includes('D')) {
+            // !r d20 +/- 2d4
+            let otherDiceAry = originalMsgAry[posOffset+3].toUpperCase().split('D');
+            let numberOfDiceRolls = 1;
+            let edgeNumber = 0;
+            if (otherDiceAry.length > 2) {
+                // has multiple dice rolls
+                numberOfDiceRolls = otherDiceAry[0]
+                edgeNumber = otherDiceAry[2];
+            } else {
+                edgeNumber = otherDiceAry[1];
+            }
+            for (let count = 0; count < numberOfDiceRolls; count++) { 
+                let diceRoll = await rollDice(edgeNumber);
+                extraValue += parseInt(diceRoll);
+            }
+            operation = originalMsgAry[posOffset+2];
+        } else if (originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) {
             extraValue += parseInt(originalMsgAry[posOffset+3]);
             operation = originalMsgAry[posOffset+2];
         }
@@ -292,16 +311,37 @@ let parseDiceCommandAndGetRoll = async function(originalMsg, firstLetterInMsg, m
         let edgesAndRolls = originalMsgAry[posOffset+1].replace(/!r/g, '').toUpperCase().split('D');
         let numberOfRolls = parseInt(edgesAndRolls[0]);
         let numberOfEdges = parseInt(edgesAndRolls[1]);
-        let extraValue = 0;
-        let operation = null;
-        if (originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) {
-            extraValue += parseInt(originalMsgAry[posOffset+3]);
-            operation = originalMsgAry[posOffset+2];
-        }
+        
         let total = 0;
         let finalMsg = '';
         for (let index = 0; index < numberOfRolls; index++) {	
             let roll = await rollDice(numberOfEdges);
+
+            let extraValue = 0;
+            let operation = null;
+            if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0))
+                && originalMsgAry[posOffset+3].toUpperCase().includes('D')) {
+                // !r d20 +/- 2d4
+                let otherDiceAry = originalMsgAry[posOffset+3].toUpperCase().split('D');
+                let numberOfDiceRolls = 1;
+                let edgeNumber = 0;
+                if (otherDiceAry.length > 2) {
+                    // has multiple dice rolls
+                    numberOfDiceRolls = otherDiceAry[0]
+                    edgeNumber = otherDiceAry[2];
+                } else {
+                    edgeNumber = otherDiceAry[1];
+                }
+                for (let count = 0; count < numberOfDiceRolls; count++) { 
+                    let diceRoll = await rollDice(edgeNumber);
+                    extraValue += parseInt(diceRoll);
+                }
+                operation = originalMsgAry[posOffset+2];
+            } else if (originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) {
+                // !r d20 +/- X
+                extraValue += parseInt(originalMsgAry[posOffset+3]);
+                operation = originalMsgAry[posOffset+2];
+            }
 
             let extraValueStr = '';
             if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) && operation) {
