@@ -16,7 +16,7 @@ const quantumRandom = require('qrandom');
 const DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
 const CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
 const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
-const ATTACK_REGEX = /^!(attack|atk|attk)([\s]+(\-)?[0-9]+)[\s]*?$/i;
+const ATTACK_REGEX = /^!(attack|atk|attk)([\s]+(\-)?[0-9]+)?[\s]*$/i;
 const DEFEND_REGEX = /^!(defend|defense|def)([\s]+(\-)?[0-9]+)?([\s]+[0-9]+)?[\s]*$/i;
 const MAP_LOAD_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+load=[A-Za-z0-9\,\.\_]+(\s)*$/i;
 const MAP_SAVE_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+[A-Za-z0-9]+=([A-Za-z0-9\_\:\-\.]+[\,]*(\n)*)+((\s)+(players|characters)\=([A-Za-z0-9\.\_]+\|[A-Za-z0-9\.\_]+\|[0-9]+\:[0-9]+(\,)*)+)?$/i;
