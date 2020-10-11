@@ -1,6 +1,10 @@
 /*
  * rpg-companion.js is designed to parse out and execute the commands for 
- * the RPGCompanion Discord Bot 
+ * the RPGCompanion Discord Bot including features such as
+ * 
+ * - Dice rolling
+ * - Character creating, updating, and showing
+ * - Emoji battle map generation 
  *
  * @author Nathanial W. Heard
  */
@@ -12,12 +16,16 @@ const quantumRandom = require('qrandom');
 const DICE_COMMAND_REGEX = /^!r[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
 const CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
 const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+[\s]*[\+\-\*\/]?[\s]*[0-9]*[\s]*$/;
-const ATTACK_REGEX = /^!(attack|atk|attk)[\s]*$/i;
-const DEFEND_REGEX = /^!(defend|defense|def)[\s]*$/i;
+const ATTACK_REGEX = /^!(attack|atk|attk)([\s]+(\-)?[0-9]+)[\s]*?$/i;
+const DEFEND_REGEX = /^!(defend|defense|def)([\s]+(\-)?[0-9]+)?([\s]+[0-9]+)?[\s]*$/i;
 const MAP_LOAD_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+load=[A-Za-z0-9\,\.\_]+(\s)*$/i;
 const MAP_SAVE_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+[A-Za-z0-9]+=([A-Za-z0-9\_\:\-\.]+[\,]*(\n)*)+((\s)+(players|characters)\=([A-Za-z0-9\.\_]+\|[A-Za-z0-9\.\_]+\|[0-9]+\:[0-9]+(\,)*)+)?$/i;
 const MAP_MOVE_REGEX = /^!(move|mv|mov|moves)[\s]+[A-Za-z0-9\.\_]+[\s]+([A-Za-z0-9\.\_]+\|[0-9]+:[0-9]+(\s)*(\,)*)+$/i;
 const MAP_SUMMON_REGEX = /^!(summon|sum)[\s]+[A-Za-z0-9\,\.\_]+[\s]+([A-Za-z0-9\.\_]+\|[A-Za-z0-9\.\_]+\|[0-9]+:[0-9]+(\s)*(\,)*)+$/i;
+
+// Seed random number cache
+let randomNumbers = [];
+let randomNumPos = 0;
 
 module.exports = {
     // Main logic flow to process commands
@@ -25,16 +33,16 @@ module.exports = {
         try {
             // If message starts with !, attempt to process it
             if (msg.content.startsWith('!')) {
-                let originalMsg = msg.content;
+                let originalMsg = msg.content.replace(/[\s]+/g, ' ');
                 let msgAry = originalMsg.replace(/\s/g, '').split('');
 
                 // Valid dice commands !r 2d6 +/- X, where X is some number
                 if (originalMsg.startsWith('!r') &&  DICE_COMMAND_REGEX.test(originalMsg)) {
                     let response = await parseDiceCommandAndGetRoll(originalMsg, msgAry[2]);
                     if (response) {
-                        msg.channel.send(response);
+                        msg.reply(response);
                     } else {
-                        msg.channel.send('Unable to parse dice command with contents: ' + originalMsg);
+                        msg.reply('Unable to parse dice command with contents: ' + originalMsg);
                     }
                 }
 
@@ -53,7 +61,7 @@ module.exports = {
                 if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'U' && CREATE_COMMAND_REGEX.test(originalMsg)) {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
                         if (!data) {
-                            msg.channel.send('Unable to find character data...');
+                            msg.reply('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data)
@@ -66,7 +74,7 @@ module.exports = {
                             }
                             console.log('Updated contents to ' + msg.author.username + '_characters.json...');
                         });
-                        msg.channel.send('Processed update character: ' + characterJson);
+                        msg.reply('Processed update character: ' + characterJson);
                     });
                 } else if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'C' && CREATE_COMMAND_REGEX.test(originalMsg)) {
                     character = parseContents(character, originalMsg)
@@ -78,46 +86,43 @@ module.exports = {
                         }
                         console.log('Wrote contents to ' + msg.author.username + '_character.json...');
                     });
-                    msg.channel.send('Processed create character: ' + characterJson);
+                    msg.reply('Processed create character: ' + characterJson);
                 } else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'D') {
                     character = parseContents(character, originalMsg)
                 
                     let characterJson = JSON.stringify(character);
                     fs.unlinkSync(msg.author.username + '_character.json');
-                    msg.channel.send('Processed delete character: ' + characterJson);
+                    msg.reply('Processed delete character: ' + characterJson);
                 } else if (msgAry.length == 2 && msgAry[1].toUpperCase() === 'S') {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
                         if (!data) {
-                            msg.channel.send('Unable to find character data...');
+                            msg.reply('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data)
                         let characterJson = JSON.stringify(character);
                         console.log('Reading contents to ' + msg.author.username + '_character.json...');
-                        msg.channel.send('Processed read character: ' + characterJson);
+                        msg.reply('Processed read character: ' + characterJson);
                     });
                 }
 
-                // !c  attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"}] weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
+                // !c weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
+                // !attack 1, 1) !attack 2) 1 or the number to mod the roll by
                 if (msgAry.length >= 2 && ATTACK_REGEX.test(originalMsg)) {
-
+                    let msgAry = originalMsg.split(' ');
+                    let mod = 0;
+                    if (msgAry.length > 1) {
+                        mod = parseInt(msgAry[1]);
+                    }
                     fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
                         if (!data) {
-                            msg.channel.send('Unable to find character data...');
+                            msg.reply('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data);
                         if (character && character.weapons != null && character.weapons.length > 0) {
                             // Roll hit dice first and add modifier
-                            let hitStatMod = 0;
-                            if (character.attributes) {
-                                for (let attribute of character.attributes) {
-                                    if (attribute && attribute.isHitStat && !isNaN(attribute.mod)) {
-                                        hitStatMod = parseInt(attribute.mod);
-                                    }
-                                }
-                            }
-                            rollHitDice(character, msg, hitStatMod);
+                            rollHitDice(character, msg, mod, character.weapons.length);
 
                             for (let weapon of character.weapons) {
                                 if (weapon && weapon.name && weapon.attack && DICE_REGEX.test(weapon.attack)) {
@@ -128,36 +133,39 @@ module.exports = {
                                     if (response) {
                                         msg.channel.send('Attack ' + response);
                                     } else {
-                                        msg.channel.send('Unable to parse weapon dice command with contents: ' + JSON.stringify(weapon));
+                                        msg.reply('Unable to parse weapon dice command with contents: ' + JSON.stringify(weapon));
                                     }
                                 } else {
-                                    msg.channel.send('Unable to find weapon...');
+                                    msg.reply('Unable to find weapon...');
                                 }
                             }
                         }
                     });
                 }
 
-                // !c system="2d20" attributes=[{name:"STR",value:"14",mod:"-4",isHitStat:"true"},{name:"AGI",value:"14",mod:"-2",isDefendStat:"true"}] armor=[{name:"Armor",defense:"3d4"}]
+                // !c system="2d20" armor=[{name:"Armor",defense:"3d4"}]
+                // !defend 1 2, 1) !defend 2) 1 or the number to mod the roll by 3) number of dodge rolss
                 if (msgAry.length >= 2 && DEFEND_REGEX.test(originalMsg)) {
-
+                    let msgAry = originalMsg.split(' ');
+                    let mod = 0;
+                    if (msgAry.length > 1) {
+                        console.log(msgAry[1]);
+                        mod = parseInt(msgAry[1]);
+                    }
+                    let dodgeRollCount = 1;
+                    if (msgAry.length > 2) {
+                        console.log(msgAry[2]);
+                        dodgeRollCount = parseInt(msgAry[2]);
+                    }
                     fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
                         if (!data) {
-                            msg.channel.send('Unable to find character data...');
+                            msg.reply('Unable to find character data...');
                             return;
                         }
                         character = JSON.parse(data);
                         if (character && character.armor != null && character.armor.length > 0) {
                             // Roll hit dice first and add modifier
-                            let defendStatMod = 0;
-                            if (character.attributes) {
-                                for (let attribute of character.attributes) {
-                                    if (attribute && attribute.isDefendStat && !isNaN(attribute.mod)) {
-                                        defendStatMod = parseInt(attribute.mod);
-                                    }
-                                }
-                            }
-                            rollHitDice(character, msg, defendStatMod);
+                            rollHitDice(character, msg, mod, dodgeRollCount);
 
                             for (let selectedArmor of character.armor) {
                                 if (selectedArmor && selectedArmor.defense && DICE_REGEX.test(selectedArmor.defense)) {
@@ -166,12 +174,12 @@ module.exports = {
                                     let armorDefCharAry = selectedArmor.defense.replace(/\s/g,'').split('');
                                     let response = await parseDiceCommandAndGetRoll(armorDefStr, armorDefCharAry[0]);
                                     if (response) {
-                                        msg.channel.send('Defend ' + response);
+                                        msg.reply('Defend ' + response);
                                     } else {
-                                        msg.channel.send('Unable to parse armor dice command with contents: ' + JSON.stringify(selectedArmor));
+                                        msg.reply('Unable to parse armor dice command with contents: ' + JSON.stringify(selectedArmor));
                                     }
                                 } else {
-                                    msg.channel.send('Unable to find armor...');
+                                    msg.reply('Unable to find armor...');
                                 }
                             }
                         }
@@ -184,21 +192,23 @@ module.exports = {
     }
 };
 
-let rollHitDice = async function(character, msg, hitStatMod) {
-    if (character.system) {
-        // Read in character.system field's dice format
-        let chrSystem = character.system;
-        let chrSystemCharAry = character.system.replace(/\s/g,'').split('');
-        let hitRes = await parseDiceCommandAndGetRoll(chrSystem, chrSystemCharAry[0], hitStatMod);
-        if (hitRes) {
-            msg.channel.send('Hit ' + hitRes);
+let rollHitDice = async function(character, msg, hitStatMod, numberOfHitRolls) {
+    for (let pos = 0; pos < numberOfHitRolls; pos++) {
+        if (character && character.system) {
+            // Read in character.system field's dice format
+            let chrSystem = character.system;
+            let chrSystemCharAry = character.system.replace(/\s/g,'').split('');
+            let hitRes = await parseDiceCommandAndGetRoll(chrSystem, chrSystemCharAry[0], hitStatMod);
+            if (hitRes) {
+                msg.reply('Hit ' + hitRes);
+            } else {
+                msg.reply('Unable to parse hit dice command with contents: ' + JSON.stringify(character.system));
+            }
         } else {
-            msg.channel.send('Unable to parse hit dice command with contents: ' + JSON.stringify(character.system));
+            // Default is 1d20
+            let hitRoll = await rollDice(20);
+            msg.reply('Hit Roll (1d20): ' + hitRoll + ' mod ' + hitStatMod + ' equals ' + (hitRoll + hitStatMod));
         }
-    } else {
-        // Default is 1d20
-        let hitRoll = await rollDice(20);
-        msg.channel.send('Hit Roll (1d20): ' + hitRoll + ' mod ' + hitStatMod + ' equals ' + (hitRoll + hitStatMod));
     }
 }
 
@@ -313,19 +323,30 @@ let parseDiceCommandAndGetRoll = async function(originalMsg, firstLetterInMsg, m
 }
 
 let rollDice = async function(numberOfEdges) {
-    return await quantumRandom('uint16', 10, 10)
-        .then(data => {
-            let randomNumber = parseInt(data[0]);
-            let randomNumberTwo = parseInt(data[1]);
 
-            let roll = Math.floor((randomNumber + randomNumberTwo) % numberOfEdges) + 1;
-            roll = parseInt(roll);
-            return roll;
-        })
-        .catch(error => {
-            console.error('Unable to read quantum numbers with error: ' + error);
-            return rollPsuedoRandom(numberOfEdges);
-        });
+    if (randomNumbers.length > 0 && randomNumPos >= 1 && randomNumPos < randomNumbers.length) {
+        // Use seeded random numbers in cache from ANU
+        let randomNumber = parseInt(randomNumbers[randomNumPos]);
+        randomNumPos++;
+        let roll = Math.floor(randomNumber % numberOfEdges) + 1;
+        roll = parseInt(roll);
+        return roll;
+    } else {
+        // Seed data from ANU or grab psuedo random if err
+        return await quantumRandom('uint16', 10, 10)
+            .then(data => {
+                randomNumbers = data;
+                randomNumPos = 1;
+                let randomNumber = parseInt(data[0]);
+                let roll = Math.floor(randomNumber % numberOfEdges) + 1;
+                roll = parseInt(roll);
+                return roll;
+            })
+            .catch(error => {
+                console.error('Unable to read quantum numbers with error: ' + error);
+                return rollPsuedoRandom(numberOfEdges);
+            });
+    }
 }
 
 let rollPsuedoRandom = function(numberOfEdges) {
