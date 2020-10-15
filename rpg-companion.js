@@ -256,110 +256,76 @@ let parseCharacterContents = function(character, originalMsg) {
 	return character;
 }
 
-// !r d20 + 1, !r 2d20 - 1, !r d20 + d4
+// !r d20 + 1, !r 2d20 - 1, !r d20 + d4 + 1 + D6
 let parseDiceCommandAndGetRoll = async function(originalMsg, firstLetterInMsg, mod) {
-    let response = null;
+    let response = '';
     let posOffset = 0;
     let originalMsgAry = originalMsg.split(' ');
-    if (originalMsgAry.length >= 1 && originalMsgAry[0] != '!r') {
-        // Is not a user command with !r
-        posOffset = -1;
-    }
 
-    if (!mod) {
-        mod = 0;
-    }
+    let lastOperation = '';
+    let grandTotal = 0;
+    for (let msgAryPos = 0; msgAryPos < originalMsgAry.length; msgAryPos++) {
 
-    if (firstLetterInMsg.toUpperCase() === 'D') {
-        // Has single dice roll
-        let numberOfEdges = originalMsgAry[posOffset+1].replace(/[Dd]/g, '');
-        let extraValue = mod;
-        let operation = null;
-        if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0))
-            && originalMsgAry[posOffset+3].toUpperCase().includes('D')) {
-            // !r d20 +/- 2d4
-            let otherDiceAry = originalMsgAry[posOffset+3].toUpperCase().split('D');
-            let numberOfDiceRolls = 1;
-            let edgeNumber = 0;
-            if (otherDiceAry.length > 2) {
-                // has multiple dice rolls
-                numberOfDiceRolls = otherDiceAry[0]
-                edgeNumber = otherDiceAry[2];
-            } else {
-                edgeNumber = otherDiceAry[1];
-            }
-            for (let count = 0; count < numberOfDiceRolls; count++) { 
-                let diceRoll = await rollDice(edgeNumber);
-                extraValue += parseInt(diceRoll);
-            }
-            operation = originalMsgAry[posOffset+2];
-        } else if (originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) {
-            extraValue += parseInt(originalMsgAry[posOffset+3]);
-            operation = originalMsgAry[posOffset+2];
+        if (originalMsgAry.length >= 1 && originalMsgAry[0] == '!r') {
+            // Is not a user command with !r
+            posOffset = 1;
+        } else {
+            posOffset = 0;
         }
-        let roll = await rollDice(numberOfEdges);
 
-        let extraValueStr = '';
-        if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) && operation) {
-            extraValueStr = getExtraValueStr(roll, extraValue, operation);
-        } else if (mod != 0) {
-            extraValueStr = ' mod ' + mod;
+        if (!mod) {
+            mod = 0;
         }
-        response = 'Roll (' + originalMsg + '): ' + roll + extraValueStr;
-    } else if (!isNaN(firstLetterInMsg)) {
-        // Has multiple dice rolls
-        let edgesAndRolls = originalMsgAry[posOffset+1].replace(/!r/g, '').toUpperCase().split('D');
-        let numberOfRolls = parseInt(edgesAndRolls[0]);
-        let numberOfEdges = parseInt(edgesAndRolls[1]);
-        
-        let total = 0;
-        let finalMsg = '';
-        for (let index = 0; index < numberOfRolls; index++) {	
+
+        let word = originalMsgAry[posOffset+msgAryPos];
+        if (!word) {
+            break;
+        }
+
+        let firstLetter = originalMsgAry[posOffset+msgAryPos][0];
+        let isOperationRegex = /[\+\-\*\/]+/i;
+        if (isOperationRegex.test(firstLetter)) {
+            lastOperation = word;
+        } else if (!word.toUpperCase().includes('D') && !isNaN(word)) {
+            grandTotal = performOperation(grandTotal, parseInt(word), lastOperation);
+            response += lastOperation + ' ' + word + ' ';
+        } else if (firstLetter.toUpperCase() === 'D') {
+            // Has single dice roll
+            let numberOfEdges = word.replace(/[Dd]/g, '');
             let roll = await rollDice(numberOfEdges);
-
-            let extraValue = 0;
-            let operation = null;
-            if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0))
-                && originalMsgAry[posOffset+3].toUpperCase().includes('D')) {
-                // !r d20 +/- 2d4
-                let otherDiceAry = originalMsgAry[posOffset+3].toUpperCase().split('D');
-                let numberOfDiceRolls = 1;
-                let edgeNumber = 0;
-                if (otherDiceAry.length > 2) {
-                    // has multiple dice rolls
-                    numberOfDiceRolls = otherDiceAry[0]
-                    edgeNumber = otherDiceAry[2];
-                } else {
-                    edgeNumber = otherDiceAry[1];
-                }
-                for (let count = 0; count < numberOfDiceRolls; count++) { 
-                    let diceRoll = await rollDice(edgeNumber);
-                    extraValue += parseInt(diceRoll);
-                }
-                operation = originalMsgAry[posOffset+2];
-            } else if (originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) {
-                // !r d20 +/- X
-                extraValue += parseInt(originalMsgAry[posOffset+3]);
-                operation = originalMsgAry[posOffset+2];
-            }
-
+            grandTotal = performOperation(grandTotal, roll, lastOperation);
             let extraValueStr = '';
-            if ((originalMsgAry.length >= 4 || (originalMsgAry.length >= 3 && posOffset < 0)) && operation) {
-                extraValueStr = getExtraValueStr(roll, extraValue, operation);
-                total += getRollWithExtraAndOperator(roll, extraValue, operation);
-            } else {
-                total += roll;
+            if (mod != 0) {
+                extraValueStr = 'mod ' + mod;
             }
-            finalMsg += '[' + roll + extraValueStr + '] ';
+            response += lastOperation + ' ' + roll + ' ' + extraValueStr;
+        } else if (!isNaN(firstLetter)) {
+            // Has multiple dice rolls
+            let edgesAndRolls = word.replace(/!r/g, '').toUpperCase().split('D');
+            let numberOfRolls = parseInt(edgesAndRolls[0]);
+            let numberOfEdges = parseInt(edgesAndRolls[1]);
+            
+            let total = 0;
+            let finalMsg = '[';
+            for (let index = 0; index < numberOfRolls; index++) {	
+                let roll = await rollDice(numberOfEdges);
+                total += roll;
+                let join = '';
+                if (index > 0) {
+                    join = ' + ';
+                }
+                finalMsg += join + roll;
+            }
+            finalMsg += ']';
+            let modStr = '';
+            if (mod != 0) {
+                modStr = ' mod ' + mod;
+            }
+            grandTotal = performOperation(grandTotal, total, lastOperation);
+            response += lastOperation + ' ' + finalMsg.trim() + modStr + ':' + (total + mod) + ' ';
         }
-        let modStr = '';
-        if (mod != 0) {
-            modStr = ' mod ' + mod;
-        }
-        response = 'Roll(s) (' + originalMsg + '): ' + finalMsg.trim() + modStr + ' with total: ' + (total + mod);
     }
-    
-    return response;
+    return 'Roll(s) (' + originalMsg + '): ' + response + 'with total: ' + grandTotal;
 }
 
 let rollDice = async function(numberOfEdges) {
@@ -399,19 +365,22 @@ let rollPsuedoRandom = function(numberOfEdges) {
     return roll;
 }
 
-let getExtraValueStr = function(roll, extraValue, operation) {
+let performOperation = function(roll, value, operation) {
 
-	let extraValueStr = '';
+	let total = roll;
 	if (operation === '+') {
-		extraValueStr = ' + ' + extraValue + ' equals: ' + (roll + extraValue) ;
+		total += value;
 	} else if (operation === '-') {
-		extraValueStr = ' - ' + extraValue + ' equals: ' + (roll - extraValue) ;
+		total -= value;
 	} else if (operation === '/') {
-		extraValueStr = ' / ' + extraValue + ' equals: ' + (roll * extraValue) ;
+		total = roll / value;
 	} else if (operation === '*') {
-		extraValueStr = ' * ' + extraValue + ' equals: ' + (roll / extraValue) ;
-	}
-	return extraValueStr;
+		total = roll * value;
+	} else {
+        // No operation provided
+        total = value;
+    }
+	return total;
 }
 
 let getRollWithExtraAndOperator = function(roll, extraValue, operation) {
