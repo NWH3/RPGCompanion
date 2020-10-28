@@ -21,9 +21,9 @@ You will need to have npm and NodeJS version 10.18.0 or greater installed on you
 - Roll Dice with Modifier: !r YdX operation Z where Y, X, and Z are some real numbers and operation is +, -, *, or /, Examples: !r 1d6 + 2 or !r d6 - 3
     - Note that the modifier is applied to each dice roll
 
-- Create Character Sheet: !c fieldOne="some value here" fieldTwo={name:"name here",type:"with type"} fieldThree=[{name:"name",type"type"}]
+- Create Character Sheet: !c fieldTwo=name|dice fieldThree=name|dice,name2|dice
 
-- Update Character Sheet: !u fieldFour="some new value here"
+- Update Character Sheet: !u fieldTwo=name3|dice
 
 - Delete Character Sheet: !d
 
@@ -34,13 +34,13 @@ You will need to have npm and NodeJS version 10.18.0 or greater installed on you
     - This command will roll your character's weapons after a hit dice roll is made, default 1d20
     - The hit dice can be changed by setting the character's system: !u system="2d20"
     - Note that the character sheet must have a weapons array in a similiar JSON array format:
-    - Add weapons to character: !u weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
+    - Add weapons to character: !u weapons=Thor's Hammer|2d6,Odin's Spear|d10 + 3
 
 - Defend with character armor: !defend X Y 
     - Where X and Y are real numbers representing the mod to the hit rolls and the number of hit rolls respectively
     - Note that the character sheet must have a armor array in a similiar JSON array format:
     - The defend hit dice can be changed by setting the character's system: !u system="2d20"
-    - Add armor to character: !u armor=[{name:"Thor's Hammer",defense:"3d4"},{name:"Odin's Spear",defense:"d8 + 1"}]
+    - Add armor to character: !u armor=Thor's Hammer|3d4,Odin's Spear|d8 + 1
 
 - Save, load, and update emoji battle maps (Word limit 2000 due to Discord, Custom emojis are still outstanding)
     - !map mapName=listOfEmojiTexts,listOfEmojiTexts,listOfEmojiTexts players=name|emojiText|x:y,name2|emojiText|x:y

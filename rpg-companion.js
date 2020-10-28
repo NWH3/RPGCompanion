@@ -16,6 +16,7 @@ const quantumRandom = require('qrandom');
 const DICE_COMMAND_REGEX = /^!r[\s]+[0-9]*[dD][0-9]+([\s]*[\+\-\*\/][\s]*([0-9]*d)?[0-9]*)*[\s]*$/;
 const DICE_REGEX = /^[\s]*[0-9]*[dD][0-9]+([\s]*[\+\-\*\/][\s]*([0-9]*d)?[0-9]*)*[\s]*$/;
 const CREATE_COMMAND_REGEX = /^![CcUuDdSs][\s]*([A-Za-z0-9]+=([0-9]*|\"[A-Za-z0-9\s\.\,\'\!\@\#\-\{\}\:\;\>\<\?\^\&\*\+\`\~]+\"[\s]*|\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,?))+\}[\s]*|\[(\{([A-Za-z0-9]+:\"[A-Za-z0-9\s\.\,\'\!\@\#\-\>\<\?\^\&\*\+\`\~]+\"(\,)?)+\}(\,?))+\][\s]*)[\s]*)+$/;
+const CHARACTER_COMMAND_REGEX = /^![CcUuDdSs][\s]+([A-Za-z0-9]+\=([A-Za-z0-9\s\.\'\#\-]+\|[A-Za-z0-9\+\-\*\/\s]+(\,)*)+[\s]*)+$/;
 const ATTACK_REGEX = /^!(attack|atk|attk)([\s]+(\-)?[0-9]+)?[\s]*$/i;
 const DEFEND_REGEX = /^!(defend|defense|def)([\s]+(\-)?[0-9]+)?([\s]+[0-9]+)?[\s]*$/i;
 const MAP_LOAD_REGEX = /^!(map|maps|hexmap|hexmaps)[\s]+load=[A-Za-z0-9\,\.\_]+(\s)*$/i;
@@ -58,7 +59,7 @@ module.exports = {
 
                 // Valid create character commands !c fieldOne="value one" fieldTwo={name:"a1",attack:"a1"} fieldArray=[{name:"a",attack:"a"},{name:"b",attack:"b"}]
                 var character = {};
-                if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'U' && CREATE_COMMAND_REGEX.test(originalMsg)) {
+                if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'U' && CHARACTER_COMMAND_REGEX.test(originalMsg)) {
                     fs.readFile(msg.author.username + '_character.json', 'utf8', function(err, data) {
                         if (!data) {
                             msg.reply('Unable to find character data...');
@@ -76,7 +77,7 @@ module.exports = {
                         });
                         msg.reply('Processed update character: ' + characterJson);
                     });
-                } else if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'C' && CREATE_COMMAND_REGEX.test(originalMsg)) {
+                } else if (msgAry.length >= 7 && msgAry[1].toUpperCase() === 'C' && CHARACTER_COMMAND_REGEX.test(originalMsg)) {
                     character = parseCharacterContents(character, originalMsg)
                 
                     let characterJson = JSON.stringify(character);
@@ -106,7 +107,7 @@ module.exports = {
                     });
                 }
 
-                // !c weapons=[{name:"Thor's Hammer",attack:"2d6"},{name:"Odin's Spear",attack:"d10 + 3"}]
+                // !c weapons=Thor's Hammer|2d6,Odin's Spear|d10 + 3
                 // !attack 1, 1) !attack 2) 1 or the number to mod the roll by
                 if (msgAry.length >= 2 && ATTACK_REGEX.test(originalMsg)) {
                     let msgAry = originalMsg.split(' ');
@@ -125,10 +126,10 @@ module.exports = {
                             await rollHitDice(character, msg, mod, character.weapons.length);
 
                             for (let weapon of character.weapons) {
-                                if (weapon && weapon.name && weapon.attack && DICE_REGEX.test(weapon.attack)) {
+                                if (weapon && weapon.name && weapon.dice && DICE_REGEX.test(weapon.dice)) {
                                     // Expect a dice format of XdY +/- Z where X, Y, and Z are real numbers
-                                    let weaponAttackStr = weapon.attack;
-                                    let weaponAttackCharAry = weapon.attack.replace(/\s/g,'').split('');
+                                    let weaponAttackStr = weapon.dice;
+                                    let weaponAttackCharAry = weapon.dice.replace(/\s/g,'').split('');
                                     let response = await parseDiceCommandAndGetRoll(weaponAttackStr, weaponAttackCharAry[0]);
                                     if (response) {
                                         msg.reply('Attack ' + response);
@@ -143,18 +144,16 @@ module.exports = {
                     });
                 }
 
-                // !c system="2d20" armor=[{name:"Armor",defense:"3d4"}]
+                // !c armor=Thor's Hammer|2d6,Odin's Spear|d10 + 3
                 // !defend 1 2, 1) !defend 2) 1 or the number to mod the roll by 3) number of dodge rolss
                 if (msgAry.length >= 2 && DEFEND_REGEX.test(originalMsg)) {
                     let msgAry = originalMsg.split(' ');
                     let mod = 0;
                     if (msgAry.length > 1) {
-                        console.log(msgAry[1]);
                         mod = parseInt(msgAry[1]);
                     }
                     let dodgeRollCount = 1;
                     if (msgAry.length > 2) {
-                        console.log(msgAry[2]);
                         dodgeRollCount = parseInt(msgAry[2]);
                     }
                     fs.readFile(msg.author.username + '_character.json', 'utf8', async function(err, data) {
@@ -168,10 +167,10 @@ module.exports = {
                             await rollHitDice(character, msg, mod, dodgeRollCount);
 
                             for (let selectedArmor of character.armor) {
-                                if (selectedArmor && selectedArmor.defense && DICE_REGEX.test(selectedArmor.defense)) {
+                                if (selectedArmor && selectedArmor.dice && DICE_REGEX.test(selectedArmor.dice)) {
                                     // Expect a dice format of XdY +/- Z where X, Y, and Z are real numbers
-                                    let armorDefStr = selectedArmor.defense;
-                                    let armorDefCharAry = selectedArmor.defense.replace(/\s/g,'').split('');
+                                    let armorDefStr = selectedArmor.dice;
+                                    let armorDefCharAry = selectedArmor.dice.replace(/\s/g,'').split('');
                                     let response = await parseDiceCommandAndGetRoll(armorDefStr, armorDefCharAry[0]);
                                     if (response) {
                                         msg.reply('Defend ' + response);
@@ -213,45 +212,27 @@ let rollHitDice = async function(character, msg, hitStatMod, numberOfHitRolls) {
 }
 
 let parseCharacterContents = function(character, originalMsg) {
-	let originalMsgAry = originalMsg.split(/[\"\}\]][\s]+|\![A-Za-z]\s/);
+    let originalMsgAry = originalMsg.split('\=');
+    let characterSection = originalMsgAry[0].split(' ')[1];
 	for (let pos = 1; pos < originalMsgAry.length; pos++) {
-		// Skip first position and start at 1
+        // Skip first position and start at 1
+        // weapons=name|d6,name2|2d10
 		let msgPart = originalMsgAry[pos];
-		let parts = msgPart.split('\=');
-		if (parts.length >= 2 && parts[1].startsWith('\"')) {
-			// Is just value, string/int
-			character[parts[0].trim()] = parts[1].replace(/\"/g, '');
-		} else  if (parts.length >= 2 && parts[1].startsWith('\{')) {
-			// Is object
-			let characterObj = {};
-			let objPos = 0;
-			let fields = parts[1].split(/\,|\:/);
-			while ((objPos + 1) < fields.length) {
-				let fieldName = fields[objPos].replace(/\"|\{|\}/g,'');
-				characterObj[fieldName] = fields[objPos + 1].replace(/\{|\}|\"/g,'');
-				objPos += 2;
-			}
-			character[parts[0].trim()] = characterObj;
-		} else if (parts.length >= 2 && parts[1].startsWith('\[')) {
-			// Is array
-			let objects = parts[1].replace(/\[|\]/g,'').split('\}\,\{');
-			let characterObjAry = [];
-			for (let objPos = 0; objPos < objects.length; objPos++) {
-				let object = objects[objPos].replace('\}|\{',''); // Clean up object
-				let objFields = object.split(',');
-				let characterObj = {};
-				for (let objFieldPos = 0; objFieldPos < objFields.length; objFieldPos++) {
-					let objField = objFields[objFieldPos];
-					let objFieldParts = objField.split(/\:/);
-					if (objFieldParts.length >= 2) {
-						// Is value, parse and add to character
-						characterObj[objFieldParts[0].replace(/\"|\{|\}/g, '')] = objFieldParts[1].replace(/\"|\{|\}/g, '');
-					}
-				}
-				characterObjAry.push(characterObj);
-			}
-			character[parts[0].trim()] = characterObjAry;
-		}
+        let parts = msgPart.split('\,');
+        let characterContents = [];
+        if (character[characterSection]) {
+            characterContents = character[characterSection];
+        }
+        for (let part of parts) {
+            let subParts = part.split('\|');
+            if (subParts.length >= 2) {
+                let name = subParts[0];
+                let dice = subParts[1];
+                characterContents.push({name: name, dice: dice});
+            }
+        }
+        character[characterSection] = characterContents;
+
 	}
 	return character;
 }
